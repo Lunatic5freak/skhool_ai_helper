@@ -1,9 +1,14 @@
 import logging
+import json
 from typing import Dict, Any, Optional
-from langchain.agents import AgentExecutor, create_react_agent
-from langchain.agents import Tool
-from langchain.memory import ConversationBufferMemory
-from langchain.prompts import PromptTemplate
+# from langchain.agents.agent import AgentExecutor
+# from langchain.agents.react.agent import create_react_agent
+
+from langchain.agents import  create_agent
+from langchain_classic.agents import AgentExecutor
+# from langchain_core.memory import ConversationBufferMemory
+from langchain_core.prompts import PromptTemplate
+from langchain_openai import ChatOpenAI
 
 from app.llm_services import LLMService
 from app.database import DatabaseManager
@@ -13,18 +18,20 @@ from app.tools import SampleDataTool
 from app.tools import SQLGeneratorTool
 from app.tools import DataAnalysisTool
 from app.tools import MultiStageQueryPlanner
+from app.agents_google import GeminiSQLAgent
 
 
 logger = logging.getLogger(__name__)
 
 
 class SQLAgent:
-    def __init__(self, db_manager: DatabaseManager, llm_service: LLMService):
+    def __init__(self, type: str, db_manager: DatabaseManager, llm_service: LLMService):
+        self.type = type
         self.db_manager = db_manager
         self.llm_service = llm_service
         self.tools = self._create_tools()
-        self.agent_executor = self._create_agent()
-        self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
+        self.agent = self.type == 'gemini' and GeminiSQLAgent(db_manager, llm_service) or self._create_agent()
+        # self.memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
 
     def _create_tools(self) -> list:
         """Create all tools for the agent"""
@@ -42,6 +49,8 @@ class SQLAgent:
 
     def _create_agent(self) -> AgentExecutor:
         """Create the ReAct agent with tools"""
+
+        print("Creating openai Agent...")
 
         # System prompt
         system_prompt = """You are an intelligent SQL assistant with access to an e-commerce database.
@@ -80,7 +89,6 @@ class SQLAgent:
         {agent_scratchpad}
         """)
 
-        from langchain_openai import ChatOpenAI
 
         llm = ChatOpenAI(
             model=self.llm_service.model,
@@ -89,17 +97,17 @@ class SQLAgent:
         )
 
         # Create agent
-        agent = create_react_agent(
-            llm=llm,
+        agent = create_agent(
+            model=llm,
             tools=self.tools,
-            prompt=react_prompt
+            system_prompt=system_prompt
         )
 
         # Create executor
         agent_executor = AgentExecutor(
             agent=agent,
             tools=self.tools,
-            memory=self.memory,
+            # memory=self.memory,
             verbose=True,
             handle_parsing_errors=True,
             max_iterations=5,
@@ -114,31 +122,38 @@ class SQLAgent:
         try:
             # Add user context to the query
             context_query = f"User ID: {user_id}\nQuery: {user_query}"
-
+            print(self.type)
+            print("Context Query:", context_query)
             # Invoke the agent
-            response = self.agent_executor.invoke({
+            response = self.agent.agent_executor.invoke({
                 "input": context_query,
-                "system_prompt": f"Current User ID: {user_id}"
+                "system_prompt": f"Current User ID: {user_id}. Only access data for this user. Use the tools as needed and return only the final answer. Use DataAnalysisTool to analyze data after executing SQL queries and return the result in string format"
             })
 
-            # Extract SQL queries from the agent's actions
-            sql_queries = self._extract_sql_queries(response)
+            print("Agent Response:", response)
+            pretty_response = self.agent.llm.invoke([
+                "Convert SQL result into a clear Markdown answer for user query.",
+                f"User query: {user_query}",
+                f"Results: {json.dumps(response, indent=2)}"
+            ])
+            print("Pretty Response:", pretty_response)
+            return pretty_response
 
-            # Execute the last SQL query to get data
-            data = []
-            if sql_queries:
-                last_query = sql_queries[-1]
-                if last_query.upper().startswith("SELECT"):
-                    try:
-                        data = self.db_manager.execute_query(last_query)
-                    except Exception as e:
-                        logger.error(f"Error executing extracted query: {str(e)}")
+            # # Extract SQL queries from the agent's actions
+            # sql_queries = self._extract_sql_queries(response)
+
+            # # Execute the last SQL query to get data
+            # data = []
+            # if sql_queries:
+            #     last_query = sql_queries[-1]
+            #     if last_query.upper().startswith("SELECT"):
+            #         try:
+            #             data = self.db_manager.execute_query(last_query)
+            #         except Exception as e:
+            #             logger.error(f"Error executing extracted query: {str(e)}")
 
             return {
-                "response": response["output"],
-                "sql_queries": sql_queries,
-                "data": data[:10] if data else None,
-                "error": None
+                "response": response
             }
 
         except Exception as e:

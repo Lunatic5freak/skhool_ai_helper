@@ -2,7 +2,7 @@ import json
 import re
 from typing import Optional, Dict, Any, List
 from langchain.tools import BaseTool
-from langchain.callbacks.manager import CallbackManagerForToolRun
+from langchain_core.callbacks.manager import CallbackManagerForToolRun
 from pydantic import Field
 
 from app.database import DatabaseManager
@@ -195,8 +195,10 @@ class DataAnalysisTool(BaseTool):
     """Tool for analyzing query results"""
     name: str = "data_analyzer"
     description: str = """
+    After executing a SQL query, use this tool to analyze the results.
     Useful for analyzing query results and providing insights.
     Input should be the query results in JSON format or a description of what to analyze.
+    Return only final analysis results. No need to explain your thought process or the steps you took.
     """
 
     llm_service: Any = Field(exclude=True)

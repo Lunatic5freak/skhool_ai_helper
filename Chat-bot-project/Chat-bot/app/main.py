@@ -8,6 +8,7 @@ from app.database import DatabaseManager
 from app.llm_services import LLMService
 from app.agents import SQLAgent, DirectSQLGenerator
 from app.models import ChatRequest, ChatResponse
+from app.llm_services import create_llm_service
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -15,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize services
 db_manager = DatabaseManager()
-llm_service = LLMService(db_manager)
-sql_agent = SQLAgent(db_manager, llm_service)
+llm_service = create_llm_service("openai", db_manager)
+sql_agent = SQLAgent('openai', db_manager, llm_service)
 direct_generator = DirectSQLGenerator(db_manager, llm_service)
 
 app = FastAPI(
@@ -86,12 +87,11 @@ async def chat_with_agent(request: ChatRequest):
         result = sql_agent.process_query(request.message, request.user_id)
 
         return ChatResponse(
-            response=result["response"],
-            sql_query=result.get("sql_queries", [""])[0] if result.get("sql_queries") else None,
-            data=result.get("data"),
+            response=result,
+            sql_query="",
             session_id=request.session_id or f"agent_{request.user_id}",
             timestamp=datetime.now().isoformat(),
-            error=result.get("error")
+            error=None
         )
 
     except Exception as e:
@@ -137,7 +137,8 @@ async def chat_direct(request: ChatRequest):
 async def get_tables():
     """Get list of all tables"""
     schema = db_manager.get_table_schema()
-    return {"tables": list(schema.keys())}
+    models = llm_service.list_accessible_models()
+    return {"tables": list(schema.keys()), "models": models}
 
 
 @app.get("/schema/{table_name}")

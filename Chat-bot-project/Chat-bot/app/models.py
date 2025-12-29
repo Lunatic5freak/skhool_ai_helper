@@ -10,7 +10,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    response: str
+    response: Any
     sql_query: Optional[str] = None
     data: Optional[List[Dict[str, Any]]] = None
     error: Optional[str] = None
