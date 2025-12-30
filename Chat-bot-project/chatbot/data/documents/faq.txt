@@ -1,0 +1,2 @@
+This chatbot answers questions about our internal database and policies.
+It supports SQL queries and document retrieval.
