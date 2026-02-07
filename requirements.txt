@@ -1,0 +1,50 @@
+# School Management Chatbot - Requirements
+
+# Core LangChain and LangGraph
+langchain
+langchain-anthropic
+langchain-openai==0.1.8
+langchain-google-genai==1.0.6
+langgraph==0.0.55
+langsmith==0.1.65
+
+# Database
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.1
+asyncpg==0.29.0
+
+# Authentication & Security
+pyjwt==2.8.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# API Framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# Observability
+langfuse==2.20.0
+prometheus-client==0.20.0
+
+# Data Processing & Analysis
+pandas==2.2.2
+numpy==1.26.4
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# Utilities
+python-dotenv==1.0.1
+redis==5.0.4
+aiohttp==3.9.5
+
+# Testing
+pytest==8.2.0
+pytest-asyncio==0.23.6
+httpx==0.27.0
+
+# Logging
+loguru==0.7.2
